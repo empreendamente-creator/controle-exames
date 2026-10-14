@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Controle de Exames</title>
+  <meta name="description" content="Registro de exames realizados nos pacientes.">
+  <meta name="theme-color" content="#0e7490">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Exames">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body class="fora">
+  <!-- Login -->
+  <div class="tela-entrada" id="tela-entrada">
+    <div class="caixa-entrada">
+      <img src="icons/icon-192.png" alt="" width="56" height="56">
+      <h1>Controle de Exames</h1>
+
+      <form id="form-login" autocomplete="on">
+        <label class="campo"><span>E-mail</span><input type="email" name="email" autocomplete="username" required></label>
+        <label class="campo"><span>Senha</span><input type="password" name="senha" autocomplete="current-password" required></label>
+        <button class="botao primario largo" type="submit">Entrar</button>
+        <button class="link" type="button" id="esqueci">Esqueci minha senha</button>
+      </form>
+
+      <form id="form-nova-senha" hidden autocomplete="on">
+        <p>Escolha uma nova senha.</p>
+        <label class="campo"><span>Nova senha</span><input type="password" name="senha" autocomplete="new-password" minlength="8" required></label>
+        <label class="campo"><span>Repita a nova senha</span><input type="password" name="senha2" autocomplete="new-password" minlength="8" required></label>
+        <button class="botao primario largo" type="submit">Salvar nova senha</button>
+      </form>
+
+      <p class="carregando" id="carregando" hidden>Carregando registros…</p>
+      <p class="mensagem-entrada" id="mensagem-entrada" role="alert"></p>
+    </div>
+  </div>
+
+  <header class="topo">
+    <div class="marca">
+      <img src="icons/icon-192.png" alt="" width="32" height="32">
+      <span>Controle de Exames</span>
+    </div>
+    <nav class="abas" id="abas">
+      <button data-aba="atendimento" class="ativa">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>Atendimento</span>
+      </button>
+      <button data-aba="registros">
+        <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>Registros</span>
+      </button>
+      <button data-aba="relatorios">
+        <svg viewBox="0 0 24 24"><path d="M5 20V10M12 20V4M19 20v-7"/></svg><span>Relatórios</span>
+      </button>
+      <button data-aba="ajustes">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg><span>Ajustes</span>
+      </button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ATENDIMENTO -->
+    <section id="aba-atendimento" class="aba ativa">
+      <div class="aviso" id="aviso-vazio" hidden>
+        <strong>Nenhum dado ainda.</strong> Para trazer o histórico da planilha, vá em
+        <a href="#" data-ir="ajustes">Ajustes → Importar planilha</a>.
+      </div>
+
+      <form id="form-atendimento" class="cartao" autocomplete="off">
+        <h2>Registrar atendimento</h2>
+        <div class="grade">
+          <label class="campo">
+            <span>Data do exame</span>
+            <input type="date" name="data" required>
+          </label>
+          <label class="campo">
+            <span>Prontuário</span>
+            <input type="text" name="prontuario" inputmode="text" placeholder="Ex.: 852611/72">
+          </label>
+          <label class="campo largo sugestivo">
+            <span>Nome do paciente</span>
+            <input type="text" name="paciente" required placeholder="Digite para buscar pacientes já atendidos">
+            <ul class="sugestoes" id="sugestoes" hidden></ul>
+          </label>
+        </div>
+        <p class="historico" id="historico-paciente" hidden></p>
+
+        <fieldset class="campo">
+          <legend>Exames realizados <small>(toque em um ou mais)</small></legend>
+          <div class="fichas" id="fichas-exames"></div>
+        </fieldset>
+
+        <div class="grade">
+          <label class="campo">
+            <span>Médico solicitante</span>
+            <select name="medico" required></select>
+          </label>
+          <label class="campo">
+            <span>Convênio</span>
+            <select name="convenio" required></select>
+          </label>
+        </div>
+
+        <label class="campo">
+          <span>Observações</span>
+          <input type="text" name="obs" list="lista-obs" placeholder="Ex.: fez AO, PAGO, cidade…">
+          <datalist id="lista-obs"></datalist>
+        </label>
+        <div class="fichas pequenas" id="fichas-obs"></div>
+
+        <div class="acoes">
+          <button type="reset" class="botao secundario">Limpar</button>
+          <button type="submit" class="botao primario">Salvar</button>
+        </div>
+      </form>
+
+      <div class="cartao">
+        <div class="cabecalho-lista">
+          <h2 id="titulo-dia">Registros do dia</h2>
+          <span class="contagem" id="contagem-dia"></span>
+        </div>
+        <div id="lista-dia"></div>
+      </div>
+    </section>
+
+    <!-- REGISTROS -->
+    <section id="aba-registros" class="aba">
+      <div class="cartao">
+        <form id="filtros" class="filtros" autocomplete="off">
+          <label class="campo largo">
+            <span>Buscar paciente ou prontuário</span>
+            <input type="search" name="busca" placeholder="Nome ou nº do prontuário">
+          </label>
+          <label class="campo"><span>De</span><input type="date" name="de"></label>
+          <label class="campo"><span>Até</span><input type="date" name="ate"></label>
+          <label class="campo"><span>Exame</span><select name="exame"></select></label>
+          <label class="campo"><span>Médico</span><select name="medico"></select></label>
+          <label class="campo"><span>Convênio</span><select name="convenio"></select></label>
+          <label class="campo"><span>Observação contém</span><input type="search" name="obs"></label>
+        </form>
+        <div class="barra-resultados">
+          <span id="contagem-registros" class="contagem"></span>
+          <div class="botoes-linha">
+            <button class="botao secundario" id="limpar-filtros" type="button">Limpar filtros</button>
+            <button class="botao secundario" id="exportar-filtrados" type="button">Exportar para Excel</button>
+          </div>
+        </div>
+      </div>
+      <div class="cartao sem-padding">
+        <div id="lista-registros"></div>
+        <div class="mais"><button class="botao secundario" id="mostrar-mais" type="button" hidden>Mostrar mais</button></div>
+      </div>
+    </section>
+
+    <!-- RELATÓRIOS -->
+    <section id="aba-relatorios" class="aba">
+      <div class="cartao">
+        <div class="periodos" id="periodos">
+          <button data-p="hoje">Hoje</button>
+          <button data-p="mes" class="ativa">Este mês</button>
+          <button data-p="mes-passado">Mês passado</button>
+          <button data-p="ano">Este ano</button>
+          <button data-p="12m">Últimos 12 meses</button>
+          <button data-p="tudo">Tudo</button>
+        </div>
+        <div class="grade">
+          <label class="campo"><span>De</span><input type="date" id="rel-de"></label>
+          <label class="campo"><span>Até</span><input type="date" id="rel-ate"></label>
+          <label class="campo"><span>Médico</span><select id="rel-medico"></select></label>
+          <label class="campo"><span>Convênio</span><select id="rel-convenio"></select></label>
+        </div>
+      </div>
+      <div class="indicadores" id="indicadores"></div>
+      <div class="colunas-relatorio">
+        <div class="cartao"><h2>Por exame</h2><div id="rel-exames"></div></div>
+        <div class="cartao"><h2>Por médico solicitante</h2><div id="rel-medicos"></div></div>
+        <div class="cartao"><h2>Por convênio</h2><div id="rel-convenios"></div></div>
+        <div class="cartao"><h2>Por mês</h2><div id="rel-meses"></div></div>
+      </div>
+      <div class="acoes"><button class="botao secundario" id="exportar-relatorio" type="button">Exportar relatório para Excel</button></div>
+    </section>
+
+    <!-- AJUSTES -->
+    <section id="aba-ajustes" class="aba">
+      <div class="cartao">
+        <h2>Cadastros</h2>
+        <div class="periodos" id="tipos-cadastro">
+          <button data-t="exames" class="ativa">Exames</button>
+          <button data-t="medicos">Médicos</button>
+          <button data-t="convenios">Convênios</button>
+        </div>
+        <form id="form-novo-cadastro" class="linha-novo" autocomplete="off">
+          <input type="text" name="nome" placeholder="Nome do novo item" required>
+          <button class="botao primario" type="submit">Adicionar</button>
+        </form>
+        <p class="ajuda">Itens desativados deixam de aparecer no atendimento, mas continuam nos registros antigos.</p>
+        <div id="lista-cadastro"></div>
+      </div>
+
+      <div class="cartao">
+        <h2>Conta</h2>
+        <div class="linha-conta">
+          <span>Conectado como <strong id="usuario-email"></strong></span>
+          <div class="botoes-linha">
+            <button class="botao secundario" id="trocar-senha" type="button">Trocar senha</button>
+            <button class="botao secundario" id="sair" type="button">Sair</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="cartao">
+        <h2>Dados e cópias de segurança</h2>
+        <p class="ajuda" id="resumo-dados"></p>
+        <div class="blocos-dados">
+          <div class="bloco">
+            <h3>Importar planilha</h3>
+            <p>Traz os exames, médicos, convênios e lançamentos da planilha “Planilha de Controle de Exames.xlsx” para o banco de dados online. Substitui o que estiver no app.</p>
+            <label class="check"><input type="checkbox" id="incluir-sf" checked> Incluir a aba “São Francisco - Antigas”</label>
+            <label class="botao secundario arquivo">Escolher planilha…<input type="file" id="arquivo-planilha" accept=".xlsx,.xls"></label>
+          </div>
+          <div class="bloco">
+            <h3>Cópia de segurança</h3>
+            <p>Os dados ficam no banco online. Mesmo assim, baixe uma cópia de vez em quando e guarde em outro lugar (pen drive, Google Drive…).</p>
+            <p class="ajuda" id="ultimo-backup"></p>
+            <div class="botoes-linha">
+              <button class="botao primario" id="fazer-backup" type="button">Baixar cópia</button>
+              <label class="botao secundario arquivo">Restaurar cópia…<input type="file" id="arquivo-backup" accept=".json"></label>
+            </div>
+          </div>
+          <div class="bloco">
+            <h3>Exportar tudo para Excel</h3>
+            <p>Gera uma planilha no mesmo formato da original, com todos os registros e cadastros.</p>
+            <button class="botao secundario" id="exportar-tudo" type="button">Exportar tudo</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Diálogo de edição -->
+  <dialog id="dialogo-editar">
+    <form id="form-editar" method="dialog" autocomplete="off">
+      <h2>Editar registro</h2>
+      <div class="grade">
+        <label class="campo"><span>Data do exame</span><input type="date" name="data" required></label>
+        <label class="campo"><span>Prontuário</span><input type="text" name="prontuario"></label>
+        <label class="campo largo"><span>Nome do paciente</span><input type="text" name="paciente" required></label>
+        <label class="campo"><span>Exame</span><select name="exame" required></select></label>
+        <label class="campo"><span>Médico solicitante</span><select name="medico" required></select></label>
+        <label class="campo"><span>Convênio</span><select name="convenio" required></select></label>
+        <label class="campo largo"><span>Observações</span><input type="text" name="obs" list="lista-obs"></label>
+      </div>
+      <div class="acoes separadas">
+        <button type="button" class="botao perigo" id="excluir-registro">Excluir</button>
+        <div class="botoes-linha">
+          <button type="button" class="botao secundario" id="cancelar-edicao">Cancelar</button>
+          <button type="submit" class="botao primario" value="salvar">Salvar</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden>
+    <span id="toast-texto"></span>
+    <button id="toast-acao" type="button" hidden></button>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="lib/supabase.js"></script>
+  <script src="lib/xlsx.full.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

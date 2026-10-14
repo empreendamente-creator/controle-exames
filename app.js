@@ -10,7 +10,9 @@ const TIPOS = {
   medicos: { singular: 'médico', campo: 'medico' },
   convenios: { singular: 'convênio', campo: 'convenio' }
 };
-const OBS_RAPIDAS = ['fez AO', 'fez só OD', 'fez só OE', 'PAGO', 'Judicial'];
+const OBS_RAPIDAS = ['PAGO', 'Judicial'];
+const OLHOS = { AO: 'Ambos os olhos', OD: 'Olho direito', OE: 'Olho esquerdo' };
+const olhoValido = v => Object.hasOwn(OLHOS, v) ? v : null;
 const POR_PAGINA = 100;
 const DIAS_LEMBRETE_BACKUP = 7;
 
@@ -60,10 +62,11 @@ function aviso(texto, acao, fn, ms = 5000) {
 /* ---------- Banco de dados (Supabase) ---------- */
 
 const LOTE = 1000; // o Supabase devolve no máximo 1000 linhas por consulta
-const COLUNAS_LANC = 'id,data,paciente,prontuario,exame,medico,convenio,obs';
+const COLUNAS_LANC = 'id,data,paciente,prontuario,exame,medico,convenio,olho,obs';
 const camposLanc = r => ({
   data: r.data, paciente: r.paciente || '', prontuario: r.prontuario || '',
-  exame: r.exame, medico: r.medico || null, convenio: r.convenio || null, obs: r.obs || ''
+  exame: r.exame, medico: r.medico || null, convenio: r.convenio || null,
+  olho: olhoValido(r.olho), obs: r.obs || ''
 });
 const camposCad = i => ({ id: i.id, nome: i.nome, ativo: i.ativo !== false });
 
@@ -254,7 +257,7 @@ function tabela(lista, { comData = true } = {}) {
     </tr></thead><tbody>${lista.map(r => `<tr data-id="${r.id}">
       ${comData ? `<td class="data">${dataBR(r.data)}</td>` : ''}
       <td><div class="nome">${esc(r.paciente || '(sem nome)')}</div>${r.prontuario ? `<div class="sub">Pront. ${esc(r.prontuario)}</div>` : ''}</td>
-      <td>${esc(nomeDe('exames', r.exame))}</td>
+      <td>${esc(nomeDe('exames', r.exame))}${r.olho ? ` <span class="olho" title="${OLHOS[r.olho]}">${r.olho}</span>` : ''}</td>
       <td>${esc(nomeDe('medicos', r.medico))}</td>
       <td>${esc(nomeDe('convenios', r.convenio))}</td>
       <td class="sub">${esc(r.obs || '')}</td>
@@ -272,12 +275,24 @@ const ordenarRecentes = (a, b) => b.data.localeCompare(a.data) || b.id - a.id;
 
 /* ---------- Aba: Atendimento ---------- */
 
-const examesSelecionados = new Set();
+// Exames marcados no atendimento → olho escolhido para cada um (AO, OD, OE ou null).
+const examesSelecionados = new Map();
 
 function renderFichasExames() {
   $('#fichas-exames').innerHTML = ativosPorUso('exames').map(e =>
     `<button type="button" data-id="${e.id}" aria-pressed="${examesSelecionados.has(e.id)}">${esc(e.nome)}</button>`).join('')
     || '<span class="ajuda">Cadastre os exames em Ajustes.</span>';
+  renderOlhos();
+}
+
+function renderOlhos() {
+  const el = $('#olhos-exames');
+  el.innerHTML = [...examesSelecionados].map(([id, olho]) => `<div class="linha-olho" data-id="${id}">
+      <span class="nome">${esc(nomeDe('exames', id))}</span>
+      <span class="olhos">${Object.entries(OLHOS).map(([k, t]) =>
+        `<button type="button" data-olho="${k}" title="${t}" aria-pressed="${olho === k}">${k}</button>`).join('')}</span>
+    </div>`).join('');
+  el.hidden = !examesSelecionados.size;
 }
 
 function renderListaDia() {
@@ -341,8 +356,18 @@ function iniciarAtendimento() {
     const b = e.target.closest('button[data-id]');
     if (!b) return;
     const id = +b.dataset.id;
-    examesSelecionados.has(id) ? examesSelecionados.delete(id) : examesSelecionados.add(id);
+    examesSelecionados.has(id) ? examesSelecionados.delete(id) : examesSelecionados.set(id, null);
     b.setAttribute('aria-pressed', examesSelecionados.has(id));
+    renderOlhos();
+  });
+
+  // Tocar no olho já escolhido desmarca (o campo é opcional).
+  $('#olhos-exames').addEventListener('click', e => {
+    const b = e.target.closest('button[data-olho]');
+    if (!b) return;
+    const id = +b.closest('[data-id]').dataset.id;
+    examesSelecionados.set(id, examesSelecionados.get(id) === b.dataset.olho ? null : b.dataset.olho);
+    renderOlhos();
   });
 
   $('#fichas-obs').innerHTML = OBS_RAPIDAS.map(o => `<button type="button">${esc(o)}</button>`).join('');
@@ -402,10 +427,10 @@ function iniciarAtendimento() {
       convenio: +f.convenio.value,
       obs: f.obs.value.trim()
     };
-    const novos = [...examesSelecionados].map(exame => ({ ...base, exame }));
+    const novos = [...examesSelecionados].map(([exame, olho]) => ({ ...base, exame, olho }));
 
     const repetidos = novos.filter(n => dados.lancamentos.some(r =>
-      r.data === n.data && r.exame === n.exame && chavePaciente(r) === chavePaciente(n)));
+      r.data === n.data && r.exame === n.exame && (r.olho || null) === n.olho && chavePaciente(r) === chavePaciente(n)));
     if (repetidos.length && !confirm(`Já existe registro de ${repetidos.map(r => nomeDe('exames', r.exame)).join(', ')} para este paciente nesta data. Salvar mesmo assim?`)) return;
 
     const botao = f.querySelector('[type=submit]');
@@ -450,6 +475,7 @@ function abrirEdicao(id) {
   f.exame.value = r.exame;
   f.medico.value = r.medico;
   f.convenio.value = r.convenio;
+  f.olho.value = r.olho || '';
   f.obs.value = r.obs || '';
   $('#dialogo-editar').showModal();
 }
@@ -468,6 +494,7 @@ function iniciarEdicao() {
       exame: +f.exame.value,
       medico: +f.medico.value,
       convenio: +f.convenio.value,
+      olho: olhoValido(f.olho.value),
       obs: f.obs.value.trim()
     };
     await gravar('lancamentos', [alterado]);
@@ -501,9 +528,11 @@ function aplicarFiltros() {
   const obs = normal(f.obs.value);
   const de = f.de.value, ate = f.ate.value;
   const ex = +f.exame.value || null, med = +f.medico.value || null, conv = +f.convenio.value || null;
+  const olho = f.olho.value; // '' = todos, 'nenhum' = sem informação
   filtrados = dados.lancamentos.filter(r =>
     (!de || r.data >= de) && (!ate || r.data <= ate) &&
     (!ex || r.exame === ex) && (!med || r.medico === med) && (!conv || r.convenio === conv) &&
+    (!olho || (olho === 'nenhum' ? !r.olho : r.olho === olho)) &&
     (!obs || normal(r.obs).includes(obs)) &&
     (!termos.length || termos.every(t => normal(r.paciente).includes(t) || normal(r.prontuario).includes(t)))
   ).sort(ordenarRecentes);
@@ -732,6 +761,8 @@ function lerPlanilha(arquivoBuffer, incluirSF) {
   const lanc = [];
   let ignorados = 0;
   const lerLancamentos = (linhas, sufixoObs) => {
+    // Planilhas exportadas pelo app trazem a coluna "Olho" logo depois de "Obs.".
+    const colOlho = (linhas[0] || []).findIndex(h => normal(h) === 'olho');
     for (const l of linhas.slice(1)) {
       const paciente = texto(l[0]);
       const prontuario = texto(l[4]);
@@ -739,9 +770,10 @@ function lerPlanilha(arquivoBuffer, incluirSF) {
       const exame = typeof l[2] === 'number' ? Math.round(l[2]) : parseInt(l[2], 10);
       if (!l.some(v => v != null && !String(v).startsWith('='))) continue; // linha vazia
       if ((!paciente && !prontuario) || !data || !Number.isFinite(exame)) { ignorados++; continue; }
-      const obs = [texto(l[9]), texto(l[10]), sufixoObs].filter(Boolean).join(' - ');
+      const obs = [texto(l[9]), colOlho === 10 ? '' : texto(l[10]), sufixoObs].filter(Boolean).join(' - ');
       lanc.push({
         paciente, prontuario, data, exame,
+        olho: colOlho >= 0 ? olhoValido(texto(l[colOlho]).toUpperCase()) : null,
         medico: parseInt(l[5], 10) || null,
         convenio: parseInt(l[7], 10) || null,
         obs
@@ -846,12 +878,12 @@ function folha(linhas, larguras, colunaData = -1) {
 function exportarExcel(lista, nomeArquivo) {
   const wb = XLSX.utils.book_new();
   const cab = ['Nome do Paciente', 'Data do Exame', 'Código do Exame', 'Nome do Exame', 'Prontuário',
-    'Código do Médico', 'Nome do Médico', 'Código do Convênio', 'Nome do Convênio', 'Obs.'];
+    'Código do Médico', 'Nome do Médico', 'Código do Convênio', 'Nome do Convênio', 'Obs.', 'Olho'];
   const linhas = [cab, ...lista.map(r => [
     r.paciente, r.data ? serialExcel(r.data) : '', r.exame, nomeDe('exames', r.exame), r.prontuario,
-    r.medico, nomeDe('medicos', r.medico), r.convenio, nomeDe('convenios', r.convenio), r.obs || ''
+    r.medico, nomeDe('medicos', r.medico), r.convenio, nomeDe('convenios', r.convenio), r.obs || '', r.olho || ''
   ])];
-  XLSX.utils.book_append_sheet(wb, folha(linhas, [36, 12, 9, 30, 14, 9, 24, 9, 26, 30], 1), 'Lançamentos');
+  XLSX.utils.book_append_sheet(wb, folha(linhas, [36, 12, 9, 30, 14, 9, 24, 9, 26, 30, 6], 1), 'Lançamentos');
   const cad = (tipo, titulo) => XLSX.utils.book_append_sheet(wb,
     folha([['Código', titulo], ...[...dados[tipo]].sort((a, b) => a.id - b.id).map(i => [i.id, i.nome])], [8, 40]),
     { exames: 'Exame', medicos: 'Médicos', convenios: 'Convênios' }[tipo]);

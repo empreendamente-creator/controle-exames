@@ -1,7 +1,7 @@
 // Service worker: permite instalar o app e abrir a tela mais rápido.
 // Busca sempre a versão mais nova na internet; usa a cópia guardada só se a rede falhar.
 // Os dados (Supabase) nunca passam por aqui.
-const CACHE = 'exames-v3';
+const CACHE = 'exames-v4';
 const ARQUIVOS = [
   './',
   './index.html',

@@ -90,6 +90,7 @@
         <fieldset class="campo">
           <legend>Exames realizados <small>(toque em um ou mais)</small></legend>
           <div class="fichas" id="fichas-exames"></div>
+          <div class="olhos-exames" id="olhos-exames" hidden></div>
         </fieldset>
 
         <div class="grade">
@@ -105,7 +106,7 @@
 
         <label class="campo">
           <span>Observações</span>
-          <input type="text" name="obs" list="lista-obs" placeholder="Ex.: fez AO, PAGO, cidade…">
+          <input type="text" name="obs" list="lista-obs" placeholder="Ex.: PAGO, cidade…">
           <datalist id="lista-obs"></datalist>
         </label>
         <div class="fichas pequenas" id="fichas-obs"></div>
@@ -138,6 +139,11 @@
           <label class="campo"><span>Exame</span><select name="exame"></select></label>
           <label class="campo"><span>Médico</span><select name="medico"></select></label>
           <label class="campo"><span>Convênio</span><select name="convenio"></select></label>
+          <label class="campo"><span>Olho</span><select name="olho">
+            <option value="">Todos</option><option value="AO">AO (ambos)</option>
+            <option value="OD">OD (direito)</option><option value="OE">OE (esquerdo)</option>
+            <option value="nenhum">Sem informação</option>
+          </select></label>
           <label class="campo"><span>Observação contém</span><input type="search" name="obs"></label>
         </form>
         <div class="barra-resultados">
@@ -250,6 +256,10 @@
         <label class="campo"><span>Exame</span><select name="exame" required></select></label>
         <label class="campo"><span>Médico solicitante</span><select name="medico" required></select></label>
         <label class="campo"><span>Convênio</span><select name="convenio" required></select></label>
+        <label class="campo"><span>Olho</span><select name="olho">
+          <option value="">Não informado</option><option value="AO">AO (ambos os olhos)</option>
+          <option value="OD">OD (olho direito)</option><option value="OE">OE (olho esquerdo)</option>
+        </select></label>
         <label class="campo largo"><span>Observações</span><input type="text" name="obs" list="lista-obs"></label>
       </div>
       <div class="acoes separadas">

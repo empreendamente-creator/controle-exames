@@ -924,6 +924,74 @@ function exportarRelatorio() {
   XLSX.writeFile(wb, `relatorio-exames-${periodo}.xlsx`);
 }
 
+/* ---------- Campos de data no formato brasileiro ---------- */
+
+// O campo de data do navegador segue o idioma do aparelho (em inglês aparece mês/dia/ano).
+// Cada um ganha uma caixa de texto dd/mm/aaaa e um botão de calendário; o campo original
+// continua guardando a data (aaaa-mm-dd), então o resto do app não muda.
+const valorNativo = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+
+function lerDataBR(txt) {
+  const m = txt.trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+  if (!m) return null;
+  const ano = m[3].length === 2 ? '20' + m[3] : m[3];
+  const iso = `${ano}-${pad(m[2])}-${pad(m[1])}`;
+  const d = new Date(+ano, +m[2] - 1, +m[1]);
+  return isoLocal(d) === iso ? iso : null; // recusa datas como 31/02
+}
+
+function mascaraData(txt) {
+  const n = txt.replace(/\D/g, '').slice(0, 8);
+  return [n.slice(0, 2), n.slice(2, 4), n.slice(4)].filter(Boolean).join('/');
+}
+
+function camposDataBR() {
+  for (const nativo of $$('input[type=date]')) {
+    const caixa = document.createElement('span');
+    caixa.className = 'data-br';
+    const texto = Object.assign(document.createElement('input'), {
+      type: 'text', inputMode: 'numeric', placeholder: 'dd/mm/aaaa', autocomplete: 'off', maxLength: 10
+    });
+    texto.required = nativo.required;
+    const botao = Object.assign(document.createElement('button'), { type: 'button', title: 'Abrir calendário' });
+    botao.innerHTML = '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>';
+    nativo.replaceWith(caixa);
+    caixa.append(texto, botao, nativo);
+    nativo.tabIndex = -1;
+    nativo.setAttribute('aria-hidden', 'true');
+
+    const mostrar = () => { texto.value = dataBR(valorNativo.get.call(nativo)).replace('—', ''); };
+    // Quando o app muda a data por código, a caixa de texto acompanha.
+    Object.defineProperty(nativo, 'value', {
+      get: () => valorNativo.get.call(nativo),
+      set: v => { valorNativo.set.call(nativo, v); mostrar(); }
+    });
+    const avisar = () => {
+      nativo.dispatchEvent(new Event('input', { bubbles: true }));
+      nativo.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+    texto.addEventListener('input', () => {
+      const fim = texto.selectionStart === texto.value.length;
+      if (fim) texto.value = mascaraData(texto.value);
+      const iso = lerDataBR(texto.value);
+      const vazio = !texto.value.trim();
+      texto.setCustomValidity(iso || vazio ? '' : 'Digite a data como dd/mm/aaaa.');
+      if ((iso || vazio) && valorNativo.get.call(nativo) !== (iso || '')) {
+        valorNativo.set.call(nativo, iso || '');
+        avisar();
+      }
+    });
+    texto.addEventListener('blur', () => { if (lerDataBR(texto.value)) mostrar(); });
+    nativo.addEventListener('change', e => { if (e.isTrusted) mostrar(); }); // escolhida no calendário
+    botao.addEventListener('click', () => {
+      try { nativo.showPicker(); } catch { nativo.focus(); nativo.click(); }
+    });
+    nativo.form?.addEventListener('reset', () => setTimeout(mostrar));
+    mostrar();
+  }
+}
+
 /* ---------- Navegação e atualização das telas ---------- */
 
 let abaAtual = 'atendimento';
@@ -1051,6 +1119,7 @@ function iniciarLogin() {
 
 async function iniciar() {
   registrarServiceWorker();
+  camposDataBR();
   if (!window.CONFIG || !/^https?:\/\//.test(CONFIG.supabaseUrl)) {
     mostrarEntrada('');
     return mensagemEntrada('O app ainda não foi configurado: preencha o arquivo config.js com os dados do Supabase.', true);

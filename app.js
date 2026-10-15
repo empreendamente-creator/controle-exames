@@ -1102,17 +1102,21 @@ function iniciarLogin() {
     entrarNoApp({ user: data.user });
   });
 
-  $('#sair').onclick = async () => {
-    await sb.auth.signOut();
-    Object.assign(dados, { exames: [], medicos: [], convenios: [], lancamentos: [] });
-    invalidar();
-    mensagemEntrada('');
-    mostrarEntrada('login');
-  };
+  $('#sair').onclick = sair;
+  $('#sair-topo').onclick = sair;
   $('#trocar-senha').onclick = () => {
     mensagemEntrada('');
     mostrarEntrada('nova-senha');
   };
+}
+
+// Encerra a sessão neste aparelho (as outras clínicas continuam conectadas) e apaga o que ficou guardado nele.
+async function sair() {
+  if (!confirm('Sair do app neste aparelho?\n\nPara entrar de novo será preciso digitar o e-mail e a senha.')) return;
+  try { await sb.auth.signOut({ scope: 'local' }); } catch { /* sem internet: a sessão é apagada abaixo mesmo assim */ }
+  try { localStorage.clear(); sessionStorage.clear(); } catch { /* sem armazenamento */ }
+  // Recarrega a página para não sobrar nenhum dado de paciente na memória ou nos formulários.
+  location.replace(location.pathname);
 }
 
 /* ---------- Início ---------- */
